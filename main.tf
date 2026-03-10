@@ -81,7 +81,7 @@ module "eks_blueprints_kubernetes_addons" {
     set_sensitive = [
       {
         name  = "configs.secret.argocdServerAdminPassword"
-        value = bcrypt(data.aws_secretsmanager_secret_version.admin_password_version.secret_string)
+        value = random_password.argocd.result
       }
     ]
   }
