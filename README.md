@@ -1,92 +1,99 @@
-# terraform-aws-eks-blueprints
-This deployment creates a basic EKS cluster using the EKS Blueprints TF module: https://github.com/aws-ia/terraform-aws-eks-blueprints. It has two node groups, a helm chart for HashiCorp Vault service, ArgoCD deployment, and  uses Traefik for Ingress.
+# AWS EKS Blueprints - Platform Engineering
 
-## Requirements
-This deployment requires certain prerequisites
+Production-ready EKS platform with GitOps (ArgoCD), secret management (Vault), policy enforcement (Kyverno), and observability (Prometheus).
 
- * kubectl [Major:"1", Minor:"24"]
- * terraform v1.2.5
- * AWS CLI V2
-
-## [Optional] Conifgure AWS CLI
-Get Access key and Secret Access key of user
-```
-$ aws configure
-```
-and add the details
-If you are using EC2 then use IAM role with the required permissions.
-
-## Instruction to run
-After cloning run the following commands 
-```
-$ cd terraform-aws-eks-blueprints
-$ terraform init
-$ terraform apply --auto-approve
-```
-
-After complettion run the following command to configure kubectl. Enter your region
-aws eks update-kubeconfig --region <REGION> --name eks-argocd
-
-## Instruction to update Infrastructure
-
-To update any configuration in for script
-After update in terrafrom 
-
-Run following command to check the changes
-```
-$ terraform plan
-```
-Run following command to perform the changes
-```
-$ terraform apply --auto-approve
-```
-
-## Instruction to get ArgoCD admin password
-Run following command to get password. Enter your region
-```
-$ aws secretsmanager get-secret-value --secret-id argocd --region <REGION> 
-```
-
-## Instruction to open ArgoCD UI
-Run following command in you local. Make sure you have already configured kubectl
-```
-$ kubectl port-forward svc/argo-cd-argocd-server 8080:443 -n argocd 
-```
-Open http://127.0.0.1:8080/
-
-## Instruction to remove Infrastructure
-
-To destroy the whole infrastructure run the following command
+## Architecture
 
 ```
-$ terrafrom destroy
+Developer Push --> ArgoCD (GitOps) --> EKS Cluster
+                                         |
+                  +----------------------+----------------------+
+                  |                      |                      |
+            Application Pods      Platform Addons         Security Layer
+            (Helm Releases)            |                      |
+                                       +-- CoreDNS            +-- Kyverno Policies
+                                       +-- Cert Manager       +-- Network Policies
+                                       +-- Metrics Server     +-- IRSA (OIDC)
+                                       +-- Cluster Autoscaler +-- External Secrets
+                                       +-- Traefik Ingress
+                                       +-- Prometheus/Grafana
+
+Secrets: AWS Secrets Manager --> External Secrets Operator --> K8s Secrets
+Nodes:   Karpenter / Managed Node Groups (AMD64 + ARM64)
 ```
 
-## Future Improvements  
+## Key Features
 
-These are few recommecndation
+- **GitOps with ArgoCD** - Declarative, Git-driven continuous delivery
+- **HashiCorp Vault** - Centralized secrets management with Kubernetes auth
+- **External Secrets Operator** - Cloud-native secret synchronization
+- **Kyverno Policy Engine** - Kubernetes-native policy enforcement
+- **Karpenter** - Intelligent, cost-optimized node provisioning
+- **Multi-architecture** - AMD64 and ARM64 node groups
+- **Observability** - Prometheus, Grafana, and AlertManager
+- **Ingress** - Traefik with TLS via Cert Manager
+- **Security** - IRSA, Network Policies, Pod Security Standards
 
-  * Use advance configuration for managed node groups I.e custom IAM role , custom security groups etc 
-  * Use custom configuration for application deployment using helm 
-  * Create an ingress for ArgoCD or use ALB service to access it directly  
+## Prerequisites
 
+- AWS CLI v2 with admin credentials
+- Terraform >= 1.5.0
+- kubectl >= 1.28
+- Helm >= 3.12
+- ArgoCD CLI (optional)
 
+## Project Structure
 
+```
+.
+├── main.tf                  # EKS cluster, VPC, node groups
+├── variables.tf             # Input variables
+├── outputs.tf               # Cluster outputs
+├── karpenter.tf             # Karpenter node provisioner
+├── external-secrets.tf      # External Secrets Operator
+├── kyverno.tf               # Policy enforcement
+├── backend.tf               # S3 remote state
+├── modules/                 # Reusable Terraform modules
+├── helm-values/             # Helm value overrides
+└── .github/workflows/       # CI/CD pipeline
+```
 
+## Deployment
 
+```bash
+# 1. Initialize Terraform
+terraform init
 
+# 2. Review the plan
+terraform plan
 
+# 3. Deploy the platform
+terraform apply
 
+# 4. Access ArgoCD
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+# Username: admin
+# Password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
+# 5. Access Grafana
+kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+```
 
+## GitOps Workflow
 
+1. Developer pushes code to application repo
+2. CI builds container image and pushes to ECR
+3. CI updates Helm values with new image tag
+4. ArgoCD detects drift and syncs the desired state
+5. Karpenter provisions nodes if needed
+6. Kyverno validates the deployment against policies
 
+## Cleanup
 
+```bash
+terraform destroy
+```
 
+## License
 
-
-
-
-
-
-
+MIT
